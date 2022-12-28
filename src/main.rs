@@ -4,7 +4,6 @@ use std::str::FromStr;
 use tiny_http::{Request, Response, Server};
 use file_rotate::{FileRotate, ContentLimit, suffix::AppendCount, compression::Compression, TimeFrequency};
 use std::io::Write;
-use http_auth_basic::Credentials;
 
 #[derive(Parser)]
 struct Cfg {
