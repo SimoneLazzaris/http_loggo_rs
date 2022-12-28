@@ -38,29 +38,9 @@ fn writelog(jbody: &serde_json::Value, logfile: &mut dyn Write) {
     }
 }
 
-fn authenticate(request: &Request) -> bool {
-    let hh = tiny_http::HeaderField::from_str("authorization").unwrap();
-    let auth_f = request.headers().iter().position(|r| r.field==hh);
-    if auth_f.is_none() {
-        return false;
-    }
-    let auth_idx=auth_f.unwrap();
-    let authheader = request.headers()[auth_idx].value.as_str();
-    
-    if let Ok(credentials) = Credentials::from_header((&authheader).to_string()) {
-        println!("cred: {:?}", credentials);
-        return true
-    }
-    return false;
-    
-}
 
 fn process_request(request: &mut Request, logfile: &mut dyn Write) -> Response<Cursor<Vec<u8>>> {
     println!("{} - {} {}", request.remote_addr(), request.method(), request.url(), );
-    // if !authenticate(request) {
-    //     let response = Response::from_string("401\n");
-    //     return response;
-    // }
     let mut content = String::new();
     request.as_reader().read_to_string(&mut content).unwrap();
     if get_content_type(&request) == "application/json" {
