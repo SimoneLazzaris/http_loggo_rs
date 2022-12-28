@@ -2,8 +2,11 @@ use clap::Parser;
 use std::io::Cursor;
 use std::str::FromStr;
 use tiny_http::{Request, Response, Server};
-use file_rotate::{FileRotate, ContentLimit, suffix::AppendCount, compression::Compression, TimeFrequency};
+use file_rotate::{FileRotate, ContentLimit, suffix::AppendCount, compression::*, TimeFrequency};
 use std::io::Write;
+use http_auth_basic::Credentials;
+use htpasswd_verify::Htpasswd;
+use std::fs;
 
 #[derive(Parser)]
 struct Cfg {
@@ -15,6 +18,8 @@ struct Cfg {
     logfile: String,
     #[arg(short, long, default_value_t = 30)]
     rotate: usize,
+    #[arg(short='H', long, default_value = "")]
+    htpasswd: String,
 }
 
 fn get_content_type(request: &Request) -> String {
@@ -37,9 +42,32 @@ fn writelog(jbody: &serde_json::Value, logfile: &mut dyn Write) {
     }
 }
 
+fn authenticate(request: &Request, pwd_dict: &Option<Htpasswd>) -> bool {
+    if pwd_dict.is_none() {
+        return true
+    }
+    let hh = tiny_http::HeaderField::from_str("authorization").unwrap();
+    let auth_f = request.headers().iter().position(|r| r.field==hh);
+    if auth_f.is_none() {
+        return false;
+    }
+    let auth_idx=auth_f.unwrap();
+    let authheader = request.headers()[auth_idx].value.as_str();
+    
+    if let Ok(credentials) = Credentials::from_header((&authheader).to_string()) {
+        println!("cred: {:?}", credentials);
+        return  pwd_dict.as_ref().expect("baba").check(&credentials.user_id, &credentials.password)
+    }
+    return false;
+    
+}
 
-fn process_request(request: &mut Request, logfile: &mut dyn Write) -> Response<Cursor<Vec<u8>>> {
+fn process_request(request: &mut Request, logfile: &mut dyn Write, pwd_dict: &Option<Htpasswd>) -> Response<Cursor<Vec<u8>>> {
     println!("{} - {} {}", request.remote_addr(), request.method(), request.url(), );
+    if !authenticate(request, pwd_dict) {
+        let response = Response::from_string("401\n");
+        return response;
+    }
     let mut content = String::new();
     request.as_reader().read_to_string(&mut content).unwrap();
     if get_content_type(&request) == "application/json" {
@@ -51,12 +79,20 @@ fn process_request(request: &mut Request, logfile: &mut dyn Write) -> Response<C
     } else {
         let _ = writeln!(logfile, "UNKOWN: {}", content);
     }
-    let response = Response::from_string("hello world\n");
+    let response = Response::from_string("OK\n");
     return response;
 }
 
 fn main() {
     let cfg = Cfg::parse();
+    let htpwd_content:String;
+    let pwd_dict : Option<Htpasswd> = if !cfg.htpasswd.is_empty() {
+        htpwd_content = fs::read_to_string(cfg.htpasswd).expect("Should have been able to read the file");
+        Some(htpasswd_verify::load(&htpwd_content))
+    } else {
+        None
+    };
+    
     let url = format!("{address}:{port}", address = cfg.address, port = cfg.port);
     println!("Starting server on {}", url);
 
@@ -65,12 +101,12 @@ fn main() {
         cfg.logfile, 
         AppendCount::new(cfg.rotate), 
         ContentLimit::Time(TimeFrequency::Hourly),
-        Compression::None, 
+        Compression::OnRotate(1), 
         #[cfg(unix)]
         None,
     );    
     for mut request in server.incoming_requests() {
-        let response = process_request(&mut request, &mut logfile);
+        let response = process_request(&mut request, &mut logfile, &pwd_dict);
         let _ = request.respond(response);
     }
 }
