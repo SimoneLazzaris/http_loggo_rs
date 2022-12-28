@@ -100,7 +100,7 @@ fn main() {
     let mut logfile = FileRotate::new(
         cfg.logfile, 
         AppendCount::new(cfg.rotate), 
-        ContentLimit::Time(TimeFrequency::Hourly),
+        ContentLimit::Time(TimeFrequency::Daily),
         Compression::OnRotate(1), 
         #[cfg(unix)]
         None,
