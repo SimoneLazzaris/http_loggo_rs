@@ -104,7 +104,8 @@ fn main() {
         Compression::OnRotate(1), 
         #[cfg(unix)]
         None,
-    );    
+    );
+    let _ = sd_notify::notify(true, &[sd_notify::NotifyState::Ready]);
     for mut request in server.incoming_requests() {
         let response = process_request(&mut request, &mut logfile, &pwd_dict);
         let _ = request.respond(response);

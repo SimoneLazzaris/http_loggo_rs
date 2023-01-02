@@ -12,3 +12,4 @@ clap = { version = "4.0", features = ["derive"] }
 file-rotate = "0.7.1"
 http-auth-basic = "0.3.3"
 htpasswd-verify = "0.2.1"
+sd-notify = "0.4.1"
