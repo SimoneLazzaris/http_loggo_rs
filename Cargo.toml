@@ -1,5 +1,5 @@
 [package]
-name = "htto_loggo"
+name = "http_loggo"
 version = "0.2.0"
 edition = "2021"
 
