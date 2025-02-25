@@ -4,6 +4,7 @@ use std::str::FromStr;
 use tiny_http::{Request, Response, Server};
 use file_rotate::{FileRotate, ContentLimit, suffix::AppendCount, compression::*, TimeFrequency};
 use std::io::Write;
+use std::io::BufWriter;
 use http_auth_basic::Credentials;
 use htpasswd_verify::Htpasswd;
 use std::fs;
@@ -62,7 +63,7 @@ fn authenticate(request: &Request, pwd_dict: &Option<Htpasswd>) -> bool {
     
 }
 
-fn process_request(request: &mut Request, logfile: &mut dyn Write, pwd_dict: &Option<Htpasswd>) -> Response<Cursor<Vec<u8>>> {
+fn process_request<W: Write>(request: &mut Request, logfile: &mut W, pwd_dict: &Option<Htpasswd>) -> Response<Cursor<Vec<u8>>> {
     println!("{} - {} {}", request.remote_addr(), request.method(), request.url(), );
     if !authenticate(request, pwd_dict) {
         let response = Response::from_string("401\n");
@@ -97,7 +98,7 @@ fn main() {
     println!("Starting server on {}", url);
 
     let server = Server::http(url).unwrap();
-    let mut logfile = FileRotate::new(
+    let logfile = FileRotate::new(
         cfg.logfile, 
         AppendCount::new(cfg.rotate), 
         ContentLimit::Time(TimeFrequency::Daily),
@@ -105,9 +106,10 @@ fn main() {
         #[cfg(unix)]
         None,
     );
+    let mut stream = BufWriter::new(logfile);
     let _ = sd_notify::notify(true, &[sd_notify::NotifyState::Ready]);
     for mut request in server.incoming_requests() {
-        let response = process_request(&mut request, &mut logfile, &pwd_dict);
+        let response = process_request(&mut request, &mut stream, &pwd_dict);
         let _ = request.respond(response);
     }
 }
