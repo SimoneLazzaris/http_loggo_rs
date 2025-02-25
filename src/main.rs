@@ -37,10 +37,16 @@ fn get_content_type(request: &Request) -> String {
 fn writelog(jbody: &serde_json::Value, logfile: &mut dyn Write) {
     if jbody.is_array() {
         for elem in jbody.as_array().unwrap() {
-            let _ = writeln!(logfile, "{}", elem.to_string());
+            let res = writeln!(logfile, "{}", elem.to_string());
+            if res.is_err() {
+                println!("Error writing to log file: {}", res.unwrap_err());
+            }
         }
     } else {
-        let _ = writeln!(logfile, "{}", jbody.to_string());
+        let res = writeln!(logfile, "{}", jbody.to_string());
+        if res.is_err() {
+            println!("Error writing to log file: {}", res.unwrap_err());
+        }
     }
 }
 
@@ -71,14 +77,22 @@ fn process_request<W: Write>(
     logfile: &mut W,
     pwd_dict: &Option<Htpasswd>,
 ) -> Response<Cursor<Vec<u8>>> {
+    if request.url() == "/health" {
+        let response = Response::from_string("OK\n").with_status_code(200);
+        return response;
+    }
     println!(
         "{} - {} {}",
         request.remote_addr(),
         request.method(),
         request.url(),
     );
+    if request.method().as_str() != "POST" {
+        let response = Response::from_string("Bad method\n").with_status_code(400);
+        return response;
+    }
     if !authenticate(request, pwd_dict) {
-        let response = Response::from_string("401\n");
+        let response = Response::from_string("401 Unauthorized\n").with_status_code(401);
         return response;
     }
     let mut content = String::new();
@@ -87,10 +101,16 @@ fn process_request<W: Write>(
         let jconv = serde_json::from_str(&content);
         if jconv.is_ok() {
             let jbody: serde_json::Value = jconv.unwrap();
+            println!("JSON body: {}", jbody);
             writelog(&jbody, logfile)
+        } else {
+            println!("JSON parse error: {}", jconv.unwrap_err());
         }
     } else {
-        let _ = writeln!(logfile, "UNKOWN: {}", content);
+        let res = writeln!(logfile, "UNKNOWN: {}", content);
+        if res.is_err() {
+            println!("Error writing to log file: {}", res.unwrap_err());
+        }
     }
     let response = Response::from_string("OK\n");
     return response;
@@ -124,5 +144,9 @@ fn main() {
     for mut request in server.incoming_requests() {
         let response = process_request(&mut request, &mut stream, &pwd_dict);
         let _ = request.respond(response);
+    }
+    let res = stream.flush();
+    if res.is_err() {
+        println!("Error flushing log file: {}", res.unwrap_err());
     }
 }
