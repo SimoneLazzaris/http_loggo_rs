@@ -1,7 +1,7 @@
 [package]
 name = "http_loggo"
-version = "0.2.0"
-edition = "2021"
+version = "0.3.0"
+edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -11,5 +11,8 @@ serde_json = "1.0"
 clap = { version = "4.0", features = ["derive"] }
 file-rotate = "0.7.1"
 http-auth-basic = "0.3.3"
-htpasswd-verify = "0.2.1"
 sd-notify = "0.4.1"
+sha1 = "0.10.6"
+pwhash = "1.0.0"
+base64 = "0.22.1"
+bcrypt = "0.17.0"
