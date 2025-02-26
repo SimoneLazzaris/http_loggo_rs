@@ -101,7 +101,6 @@ fn process_request<W: Write>(
         let jconv = serde_json::from_str(&content);
         if jconv.is_ok() {
             let jbody: serde_json::Value = jconv.unwrap();
-            println!("JSON body: {}", jbody);
             writelog(&jbody, logfile)
         } else {
             println!("JSON parse error: {}", jconv.unwrap_err());
